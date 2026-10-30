@@ -631,16 +631,16 @@ This SDK follows semantic versioning. Breaking public API changes require a majo
 
 ## Support
 
-For SDK bugs, open a [GitHub issue](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues) with a small reproduction and request id. For account and quota questions, contact [EasySlip support](https://developer.easyslip.com).
+For account, quota or billing questions, use the [contact page](https://developer.easyslip.com/contact) and include the request id if available. Report bugs and suggest features in [issues](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues). Never post API keys or real slip images.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup and test commands.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and pull requests. Maintainers follow [RELEASING.md](RELEASING.md).
 
 ## Security reports
 
-Follow [SECURITY.md](SECURITY.md) to report privately. Never post API keys or customer slips in public issues.
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), or email [hello@easyslip.com](mailto:hello@easyslip.com). Never report vulnerabilities in public issues.
 
 ## License
 
-[MIT](LICENSE), Copyright (c) 2026 EasySlip Co., Ltd.
+[MIT](LICENSE). Copyright (c) 2026 EasySlip Co., Ltd.

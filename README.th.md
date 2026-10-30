@@ -629,18 +629,18 @@ SDK ใช้ semantic versioning การเปลี่ยน public API ท�
 
 [ตัวอย่างที่รันได้](examples/README.md) แยกโปรแกรมตามแต่ละเมธอด ดูตัวเลือกทั้งหมดได้ที่ [คู่มือ Go SDK](https://document.easyslip.com/th/sdk/go) และ [API reference](https://document.easyslip.com)
 
-## ขอความช่วยเหลือ
+## ช่วยเหลือ
 
-หากพบปัญหา SDK ให้เปิด [GitHub issue](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues) พร้อมตัวอย่างปัญหาและ request id เรื่องบัญชีหรือโควต้าติดต่อ [EasySlip support](https://developer.easyslip.com)
+เรื่องบัญชี โควต้า หรือการชำระเงิน ติดต่อผ่าน[หน้าติดต่อเรา](https://developer.easyslip.com/contact) พร้อม request id ถ้ามี แจ้งบั๊กหรือขอฟีเจอร์ได้ใน [issues](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues) ห้ามแนบ API key หรือรูปสลิปจริง
 
 ## ร่วมพัฒนา
 
-ดูวิธีเตรียมระบบและรันทดสอบใน [CONTRIBUTING.md](CONTRIBUTING.md)
+อ่านวิธีติดตั้งเครื่องมือ รันทดสอบ และส่ง pull request ใน [CONTRIBUTING.md](CONTRIBUTING.md) ผู้ดูแลการออกเวอร์ชันอ่าน [RELEASING.md](RELEASING.md)
 
-## แจ้งช่องโหว่
+## แจ้งปัญหาความปลอดภัย
 
-แจ้งเป็นการส่วนตัวตาม [SECURITY.md](SECURITY.md) ห้ามโพสต์ API key หรือสลิปของลูกค้าใน issue สาธารณะ
+แจ้งแบบส่วนตัวตาม [SECURITY.md](SECURITY.md) หรือส่งอีเมลไปที่ [hello@easyslip.com](mailto:hello@easyslip.com) ห้ามแจ้งช่องโหว่ใน issue สาธารณะ
 
 ## สัญญาอนุญาต
 
-[MIT](LICENSE), Copyright (c) 2026 EasySlip Co., Ltd.
+[MIT](LICENSE). Copyright (c) 2026 EasySlip Co., Ltd.
