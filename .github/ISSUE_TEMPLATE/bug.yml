@@ -1,0 +1,10 @@
+name: Bug report
+description: Report SDK behavior that differs from the documentation.
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include SDK and runtime versions, expected and actual results, and a minimal example. Remove keys and personal data.
+    validations:
+      required: true

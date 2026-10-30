@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: API documentation
+    url: https://document.easyslip.com/en/sdk/python
+    about: Check the SDK and API reference.
+  - name: Account support
+    url: https://easyslip.com/
+    about: Get help with your account, quota or billing.
