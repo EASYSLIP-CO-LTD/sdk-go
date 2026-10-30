@@ -3,3 +3,4 @@ coverage.html
 .env
 .env.*
 api-key.txt
+__pycache__/
