@@ -1,4 +1,4 @@
-// Package easyslip provides typed clients for the EasySlip API.
+// Package easyslip verifies Thai bank and TrueMoney slips and checks receiving accounts, amounts and duplicates.
 package easyslip
 
 import (

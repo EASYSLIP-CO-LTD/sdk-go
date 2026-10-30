@@ -1,16 +1,24 @@
-# EasySlip SDK for Go
+# EasySlip Go SDK
 
 [![CI](https://github.com/EASYSLIP-CO-LTD/sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/EASYSLIP-CO-LTD/sdk-go/actions/workflows/ci.yml) [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Use the EasySlip API from Go to verify slips, manage receiving accounts and generate payment QR codes.
+Verify Thai bank transfer slips and TrueMoney Wallet receipts from Go. Check the receiving account, amount and duplicate status before crediting an order.
+
+[ภาษาไทย](README.th.md)
 
 ## Features
 
-The client supports v2 verification and asynchronous jobs, bank accounts, account information and the legacy v1 API. Requests accept contexts, errors work with `errors.As` and `errors.Is`, and webhook helpers check signatures over the original body.
+- Verify a bank slip from an image, QR payload, URL or base64.
+- Check whether a transfer pays a linked receiving account for the expected amount.
+- Detect previously used slips before accepting payment.
+- Verify TrueMoney Wallet receipts.
+- Read remaining quota and manage receiving accounts.
+- Submit batches, track background jobs and authenticate webhooks.
+- Generate PromptPay and bill payment QR codes.
 
 ## Requirements
 
-Go 1.26 or 1.27. The SDK uses only the standard library.
+Go 1.26 or 1.27. The SDK uses only the standard library. Create a service in [the EasySlip developer portal](https://developer.easyslip.com), then copy its API key into your server environment as `EASYSLIP_API_KEY`. You can instead set `EASYSLIP_API_KEY_FILE` to a private file containing the key.
 
 ## Installation
 
@@ -20,126 +28,619 @@ go get github.com/EASYSLIP-CO-LTD/sdk-go
 
 ## Quick start
 
-Set `EASYSLIP_API_KEY` or point `EASYSLIP_API_KEY_FILE` at a private key file. Prepare `payload.txt`, `slip.png` and `wallet-slip.png`. Replace the sample URL with a publicly reachable slip image URL. Each verification is a separate request and can consume quota.
+Save the program below as `main.go`. Put a transfer slip at `slip.png` and set the API key. In the portal, add your receiving account and link it to the service/branch associated with the key. Change `150.0` to the order amount from your own database, not a value sent by the customer. Each verification can consume quota.
 
 ```go
 package main
 
 import (
-    "context"
-    "encoding/base64"
-    "log"
-    "os"
-    "strings"
-
-    "github.com/EASYSLIP-CO-LTD/sdk-go"
+	"context"
+	"errors"
+	"fmt"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
 )
 
 func main() {
-    client, err := easyslip.NewClient("")
-    if err != nil { log.Fatal(err) }
-    defer client.Close()
-    ctx := context.Background()
-    payload, err := os.ReadFile("payload.txt")
-    if err != nil { log.Fatal(err) }
-    image, err := os.ReadFile("slip.png")
-    if err != nil { log.Fatal(err) }
-    result, err := client.Verify.BankByPayload(ctx, strings.TrimSpace(string(payload)), nil)
-    if err != nil { log.Fatal(err) }
-    log.Print(result.Meta.RequestID)
-    if _, err = client.Verify.BankByImage(ctx, image, nil); err != nil { log.Fatal(err) }
-    if _, err = client.Verify.BankByURL(ctx, "https://example.com/slip.png", nil); err != nil { log.Fatal(err) }
-    if _, err = client.Verify.BankByBase64(ctx, base64.StdEncoding.EncodeToString(image), nil); err != nil { log.Fatal(err) }
-    if _, err = client.Verify.TruewalletByImage(ctx, "wallet-slip.png", nil); err != nil { log.Fatal(err) }
-    if _, err = client.GetInfo(ctx); err != nil { log.Fatal(err) }
-    if _, err = client.V1.GenerateQR(ctx, easyslip.QRRequest{Type: "PROMPTPAY", Msisdn: easyslip.Some("0812345678"), Amount: easyslip.Some(100.0)}); err != nil { log.Fatal(err) }
-    if _, err = client.V1.VerifyBankByPayload(ctx, strings.TrimSpace(string(payload)), nil); err != nil { log.Fatal(err) }
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	result, err := client.Verify.BankByImage(ctx, "slip.png", &easyslip.VerifyOptions{
+		MatchAccount: easyslip.Some(true), MatchAmount: easyslip.Some(150.0),
+		CheckDuplicate: easyslip.Some(true),
+	})
+	var pending *easyslip.SlipPendingError
+	var missing *easyslip.SlipNotFoundError
+	if errors.As(err, &pending) {
+		log.Print("The bank has not made this slip available yet")
+		return
+	}
+	if errors.As(err, &missing) {
+		log.Print("No transfer was found; check the slip")
+		return
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	duplicate, checked := result.IsDuplicate.Value()
+	if !checked || duplicate {
+		log.Print("Slip used before, or duplicate check unavailable")
+		return
+	}
+	matched, checked := result.IsAmountMatched.Value()
+	if !checked || !matched {
+		log.Print("Transfer does not match the order amount")
+		return
+	}
+	account, checked := result.MatchedAccount.Value()
+	if !checked || account == nil {
+		log.Print("Transfer did not match a linked account")
+		return
+	}
+	slip := result.RawSlip
+	sender, _ := slip.Sender.Account.Name.Th.Value()
+	receiver, _ := slip.Receiver.Account.Name.Th.Value()
+	fmt.Println("Amount:", result.AmountInSlip)
+	fmt.Println("Date:", slip.Date)
+	fmt.Println("Sender:", sender)
+	fmt.Println("Receiver:", receiver)
+	fmt.Println("Transaction:", slip.TransRef)
+	fmt.Println("Payment checks passed. Record this transaction once for the order.")
 }
 ```
 
-Image methods accept `Image`, `[]byte`, a trusted local path string, or `io.Reader`. Do not pass user-supplied strings as paths. Payload methods expect the slip QR payload, not the transaction reference. URL methods ask the API to fetch an image. `GenerateQR` creates a payment QR code. Legacy methods are under `client.V1`.
+Run `go run .`. A successful check prints output like this (illustrative values):
+
+    Amount: 150.0
+    Date: 2026-10-29T14:32:00+07:00
+    Sender: ผู้โอนตัวอย่าง
+    Receiver: ร้านตัวอย่าง
+    Transaction: EXAMPLE-TRANSFER-001
+    Payment checks passed. Record this transaction once for the order.
+
+Credit the order only after all checks pass. Store the transaction reference with a database uniqueness constraint and update the order in the same transaction, so concurrent requests cannot credit it twice. The SDK does not update your orders.
+
+Next steps: [payment checks](#payment-checks), [receiving accounts](#receiving-accounts), [background jobs](#background-jobs), [error handling](#error-handling).
+
+## Usage
+
+### Verify a bank slip
+
+| What you have | Method |
+| --- | --- |
+| Image file or uploaded bytes | `client.Verify.BankByImage` |
+| QR payload text | `client.Verify.BankByPayload` |
+| Public image URL | `client.Verify.BankByURL` |
+| Base64 image | `client.Verify.BankByBase64` |
+
+Payload means the text decoded from the slip QR, not the transaction reference. Image input accepts `Image`, `[]byte`, a path string or `io.Reader`. A string is a local file path: never pass an untrusted user string, because the SDK will read that file on your server.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"os"
+	"strings"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	payload, err := os.ReadFile("payload.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	result, err := client.Verify.BankByPayload(ctx, strings.TrimSpace(string(payload)), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(result.AmountInSlip, result.RawSlip.TransRef)
+}
+```
+
+### Payment checks
+
+API v2 returns check results in a successful response: `IsDuplicate=true`, `IsAmountMatched=false`, or a null `MatchedAccount` means you must reject the payment. A mismatch does not raise an API error. The quick start also rejects missing check results. `matchAccount` checks accounts linked to this service/branch; `matchAmount` compares the transfer against your order total; `checkDuplicate` asks whether this slip was used before.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	result, err := client.Verify.BankByImage(ctx, "slip.png", &easyslip.VerifyOptions{
+		MatchAccount: easyslip.Some(true), MatchAmount: easyslip.Some(150.0),
+		CheckDuplicate: easyslip.Some(true),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	duplicate, checked := result.IsDuplicate.Value()
+	log.Print("Duplicate check:", checked, " duplicate:", duplicate)
+	matched, checked := result.IsAmountMatched.Value()
+	log.Print("Amount check:", checked, " matched:", matched)
+	account, checked := result.MatchedAccount.Value()
+	log.Print("Account check:", checked, " matched:", account != nil)
+}
+```
+
+### TrueMoney Wallet
+
+Use a Wallet receipt image. Check the same payment flags before crediting the order; the receipt reference is `RawSlip.TransactionID`.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	result, err := client.Verify.TruewalletByImage(ctx, "wallet-slip.png", &easyslip.VerifyOptions{
+		MatchAccount: easyslip.Some(true), MatchAmount: easyslip.Some(150.0),
+		CheckDuplicate: easyslip.Some(true),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(result.AmountInSlip, result.RawSlip.TransactionID)
+}
+```
+
+### Account info and quota
+
+Read quota before planning a batch. A null remaining quota means the API did not return a numeric limit; it is not zero.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	info, err := client.GetInfo(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if info.Application.Quota.Remaining == nil {
+		log.Print("No quota limit returned")
+		return
+	}
+	log.Print("Remaining quota:", *info.Application.Quota.Remaining)
+}
+```
+
+### Receiving accounts
+
+This example lists linked accounts with automatic pagination, creates a receiving account, updates its name and links it to the key's branch. Set `RECEIVING_ACCOUNT_NUMBER` to your own account; run the create step once, then reuse the returned id. `List` and `ListAll` return one page; `IterateAll` walks all service accounts.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"os"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	for account, err := range client.BankAccounts.Iterate(ctx, &easyslip.ListBankAccountsParams{Limit: easyslip.Some(50)}) {
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(account.ID, account.NameTh)
+	}
+	account, err := client.BankAccounts.Create(ctx, easyslip.CreateBankAccountParams{
+		BankCode: "004", BankNumber: os.Getenv("RECEIVING_ACCOUNT_NUMBER"),
+		NameTh: "ร้านตัวอย่าง", NameEn: "Example Shop", Type: "BANK",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	updated, err := client.BankAccounts.Update(ctx, account.ID, easyslip.UpdateBankAccountParams{NameEn: easyslip.Some("Example Shop")})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("Updated:", updated.ID)
+	linked, err := client.BankAccounts.Link(ctx, account.ID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("Linked:", linked.Linked)
+}
+```
+
+### Background jobs
+
+Submit QR payloads as a batch and keep each job id. Polling the same job does not submit another verification. `WaitForJob` waits up to ten minutes by default, including HTTP requests and retry delays; inspect the terminal status and payment checks before accepting a result.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"os"
+	"strings"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	payload, err := os.ReadFile("payload.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	batch, err := client.Jobs.SubmitBankBatch(ctx, []easyslip.BatchSlip{{
+		Payload: strings.TrimSpace(string(payload)), CheckDuplicate: easyslip.Some(true),
+	}}, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, submitted := range batch.Jobs {
+		job, err := client.Jobs.WaitForJob(ctx, submitted.JobID, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(job.JobID, job.Status, job.Result)
+	}
+}
+```
+
+### Generate a payment QR
+
+Set `PROMPTPAY_PHONE` to your PromptPay phone number. For bill payment, use `Type: "BILL_PAYMENT"` with `BillerID` and your references. Amounts must be from 0.01 to 9,999,999,999.99 with at most two decimal places; omit the amount for an open-amount QR. Save the image returned by the API:
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"os"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	qr, err := client.V1.GenerateQR(ctx, easyslip.QRRequest{
+		Type: "PROMPTPAY", Msisdn: easyslip.Some(os.Getenv("PROMPTPAY_PHONE")), Amount: easyslip.Some(150.0),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	image, err := qr.ImageBytes()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := os.WriteFile("payment-qr.png", image, 0600); err != nil {
+		log.Fatal(err)
+	}
+	log.Print("Saved payment-qr.png")
+}
+```
+
+### Legacy API v1
+
+Use v2 for new integrations. Existing v1 code can use `client.V1`; it returns the slip directly, and duplicate detection raises `DuplicateSlipError`.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	slip, err := client.V1.VerifyBankByImage(ctx, "slip.png", &easyslip.V1VerifyOptions{CheckDuplicate: easyslip.Some(true)})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(slip.Amount.Amount, slip.TransRef)
+}
+```
+
+### Contexts and concurrency
+
+Reuse a client across goroutines. Each operation accepts a context; set a deadline to bound the whole operation and defer cancellation to release its resources.
+
+```go
+package main
+
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"time"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	result, err := client.Verify.BankByImage(ctx, "slip.png", &easyslip.VerifyOptions{
+		MatchAccount: easyslip.Some(true), MatchAmount: easyslip.Some(150.0), CheckDuplicate: easyslip.Some(true),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(result.AmountInSlip)
+}
+```
+
+## The result object
+
+The bank and Wallet result share amount and payment-check fields. Bank details are under `RawSlip`; Wallet uses a different receipt model. Optional fields appear only when the API supplies them: `Field[T].Value()` returns `(value, present)`; check `IsNull()` to distinguish JSON null from absence.
+
+| Field | Type | Meaning | Example |
+| --- | --- | --- | --- |
+| `AmountInSlip` | float | Verified transfer amount in baht | 150.0 |
+| `IsDuplicate` | optional bool | Whether the slip was used before | false |
+| `IsAmountMatched` | optional bool | Whether the transfer matches the order amount | true |
+| `AmountInOrder` | optional float | Order amount sent for comparison | 150.0 |
+| `MatchedAccount` | optional account or null | Linked receiving account that matched | account object |
+| `RawSlip.TransRef` | string | Bank transaction reference | EXAMPLE-TRANSFER-001 |
+| `RawSlip.Date` | string | Transfer date and time, including offset when returned | 2026-10-29T14:32:00+07:00 |
+| `RawSlip.Sender.Account.Name.Th` | optional string | Sender name in Thai | ผู้โอนตัวอย่าง |
+| `RawSlip.Receiver.Account.Name.Th` | optional string | Receiver name in Thai | ร้านตัวอย่าง |
+| `RawSlip.Sender.Account.Bank` | `Field[AccountNumber]` | Sender account number as returned, possibly masked | xxx-x-x1234-x |
+| `RawSlip.Receiver.Account.Bank` | `Field[AccountNumber]` | Receiver account number as returned, possibly masked | xxx-x-x5678-x |
+| `RawSlip.TransactionID` | string (Wallet) | Wallet transaction reference | EXAMPLE-WALLET-001 |
+| `RawSlip.Sender.Name` | string (Wallet) | Wallet sender name | ผู้ส่งตัวอย่าง |
+| `RawSlip.Receiver.Name` | string (Wallet) | Wallet receiver name | ผู้รับตัวอย่าง |
+| `RawSlip.Receiver.Phone` | string (Wallet) | Wallet receiver phone as returned | 0xx-xxx-1234 |
+
+Read the account number from `AccountNumber.Account` after checking the field with `Value()`.
+
+See the [full Go model reference](https://document.easyslip.com/en/sdk/go).
 
 ## Configuration
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `NewClient(apiKey)` | EASYSLIP_API_KEY, then EASYSLIP_API_KEY_FILE | An explicit key takes precedence. |
-| `WithTimeout` | 30 seconds | Bound each HTTP request. |
-| `WithMaxRetries` | 2 | Set the retry budget. |
-| `WithBaseURLs` | EASYSLIP_V2_BASE_URL / EASYSLIP_V1_BASE_URL, otherwise https://api.easyslip.com/v2 /v1 | Override v2 and v1 independently. |
-| `WithHTTPClient` | SDK-owned http.Client | Supply a custom client; you retain ownership. |
+| Option | Environment variable | Default | What it does |
+| --- | --- | --- | --- |
+| `NewClient(apiKey)` | EASYSLIP_API_KEY; EASYSLIP_API_KEY_FILE | environment/file | Explicit key overrides environment; file is the fallback. |
+| `WithTimeout` | none | 30 seconds | Timeout for each HTTP attempt. |
+| `WithMaxRetries` | none | 2 | At most two additional attempts when retry rules allow. |
+| `WithBaseURLs` | EASYSLIP_V2_BASE_URL; EASYSLIP_V1_BASE_URL | https://api.easyslip.com/v2; https://api.easyslip.com/v1 | Override the API endpoints. |
+| `WithHTTPClient` | none | new HTTP client | Supply a custom client; close it yourself. |
+
+The example closes the custom HTTP client as well as the SDK client. `client.Close()` releases idle connections when the SDK created the HTTP client.
 
 ```go
-client, err := easyslip.NewClient("", easyslip.WithTimeout(15*time.Second), easyslip.WithMaxRetries(1), easyslip.WithHTTPClient(&http.Client{}))
-if err != nil { log.Fatal(err) }
-defer client.Close()
-```
+package main
 
-Pass a context with a deadline to bound the whole operation. `Jobs.WaitForJob` defaults to a two-second polling interval and a ten-minute overall timeout; `WaitOptions` overrides both. Close the client after use to release owned idle connections.
+import (
+	"context"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+	"net/http"
+	"time"
+)
+
+func main() {
+	httpClient := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
+	defer httpClient.CloseIdleConnections()
+	client, err := easyslip.NewClient("", easyslip.WithTimeout(15*time.Second), easyslip.WithMaxRetries(1), easyslip.WithHTTPClient(httpClient))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	info, err := client.GetInfo(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print(info.Application.Name)
+}
+```
 
 ## Error handling
 
-All SDK errors implement `EasySlipError`. Import `errors` for type checks and `context` for cancellation checks.
+`EasySlipError` is the root interface; HTTP errors unwrap to `ApiError`, and `RequestTimeoutError` unwraps through `NetworkError`. Use `errors.As` for error types and `errors.Is` for `context.Canceled` or `context.DeadlineExceeded`.
 
-| Error class | HTTP status | When it happens | What to do |
+| Error class | HTTP status or stage | When it happens | What to do |
 | --- | --- | --- | --- |
-| `AuthenticationError` | 401 | The key is missing or invalid. | Check the application key. |
-| `PermissionDeniedError / QuotaExceededError` | 403 | The account or quota does not allow this call. | Check account access and quota. |
-| `InvalidRequestError / InvalidImageError / InvalidUrlError` | 400, 413, 415, 422 | The API rejects the input. | Correct the input before retrying. |
-| `DuplicateSlipError` | 400 | Duplicate detection finds an earlier slip. | Use the previous verification result. |
-| `NotFoundError / SlipNotFoundError / SlipPendingError` | 404 | The resource is absent or the slip is not yet available. | Check the identifier or wait for the slip. |
-| `ConflictError` | 409 | The operation conflicts with existing state. | Read the current state before changing it. |
-| `RateLimitError` | 429 | The API is limiting requests. | Respect Retry-After. |
-| `ServerError / ServiceUnavailableError` | 5xx | The API could not complete the request. | Check service status before repeating billed calls. |
-| `NetworkError / RequestTimeoutError` | None | The connection fails or times out. | Check connectivity; avoid repeating billed calls blindly. |
-| `InputError` | None | Local validation rejects the request. | Correct the input. |
-| `WebhookSignatureError` | None | The signature does not authenticate the body. | Reject the webhook. |
-| `JobWaitTimeoutError` | None | The overall polling deadline expires. | Inspect LastJob before polling again. |
-| `BatchSubmitError` | Varies | A batch stops after partial progress. | Inspect completed results before resuming. |
+| `EasySlipError (interface)` | varies | Base for all SDK failures. | Catch a specific error first. |
+| `ApiError` | HTTP | Base for rejected API requests. | Use status, code and request id for diagnosis. |
+| `AuthenticationError` | 401 | API key is invalid. | Check the key for this service. |
+| `PermissionDeniedError` | 403 | Service, branch or IP cannot call the API. | Check service access and IP restrictions. |
+| `QuotaExceededError` | 403 | Verification quota is exhausted. | Add quota before accepting more slips. |
+| `InvalidRequestError` | 400, 422 | The API rejects an argument. | Correct the request before sending again. |
+| `InvalidImageError` | 400, 413, 415 | Image is unreadable, oversized or unsupported. | Send a readable supported image. |
+| `InvalidUrlError` | 400 | Image or callback URL is refused. | Use a reachable public HTTPS URL. |
+| `DuplicateSlipError` | 400 (v1) | A previously verified slip is submitted with duplicate checking. | Do not credit the same transfer again; inspect slip. |
+| `NotFoundError` | 404 | Resource is missing or outside this branch. | Check the account or job id and branch. |
+| `SlipNotFoundError` | 404 | No transfer or slip QR was found. | Ask for a readable slip from a completed transfer. |
+| `SlipPendingError` | 404 | A recent slip is not available from the bank yet. | Wait before checking again. |
+| `ConflictError` | 409 | Receiving account already exists. | Reuse it instead of creating another. |
+| `RateLimitError` | 429 | Request rate is too high. | Wait for RetryAfter when present. |
+| `ServerError` | 500, 502, 504 | The API or bank could not finish the request. | Reconcile billed calls before resending. |
+| `ServiceUnavailableError` | 503 | A dependency is unavailable. | Wait and check service status. |
+| `InputError` | before sending | Local validation rejects input. | Fix the argument identified by code. |
+| `NetworkError` | network | Connection fails. | Check connectivity and reconcile the outcome. |
+| `RequestTimeoutError` | network | HTTP request exceeds its timeout. | Check the payment outcome before resubmitting. |
+| `JobWaitTimeoutError` | polling deadline | Job polling exceeds the overall deadline. | Keep LastJob and poll the same job later. |
+| `BatchSubmitError` | partial batch | A chunk fails after earlier chunks were accepted. | Resume only the unsent chunks. |
+| `WebhookSignatureError` | before processing | Webhook signature is invalid or missing. | Return 400; do not process the event. |
 
 ```go
-var auth *easyslip.AuthenticationError
-var limited *easyslip.RateLimitError
-var api *easyslip.ApiError
-switch {
-case errors.As(err, &auth):
-    log.Print("Check the application API key")
-case errors.As(err, &limited):
-    log.Print("Wait before making another request")
-case errors.As(err, &api):
-    log.Printf("status=%d code=%v request_id=%v", api.Status, api.Code, api.RequestID)
-case errors.Is(err, context.DeadlineExceeded):
-    log.Print("The operation exceeded its deadline")
-case err != nil:
-    log.Printf("SDK request failed: %v", err)
+package main
+
+import (
+	"context"
+	"errors"
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+	"log"
+)
+
+func main() {
+	client, err := easyslip.NewClient("")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx := context.Background()
+	result, err := client.Verify.BankByImage(ctx, "slip.png", nil)
+	var missing *easyslip.SlipNotFoundError
+	var quota *easyslip.QuotaExceededError
+	var api *easyslip.ApiError
+	switch {
+	case errors.As(err, &missing):
+		log.Print("Ask the customer for a readable slip from a completed transfer")
+	case errors.As(err, &quota):
+		log.Print("Add verification quota before processing more payments")
+	case errors.As(err, &api):
+		log.Print("Verification failed:", api.Status, api.Message)
+	case err != nil:
+		log.Print("Outcome unknown; reconcile the payment before resubmitting")
+	default:
+		log.Print(result.AmountInSlip)
+	}
 }
 ```
 
-Safe calls retry connection failures and selected 5xx responses. HTTP 429 can also be retried. Billed verification and job submissions do not retry read timeouts or 5xx after sending. Backoff includes jitter and respects Retry-After up to 60 seconds.
+| Situation | Automatic retry (default) |
+| --- | --- |
+| Connection fails before sending | Up to 2 extra attempts, including verification. |
+| HTTP 429 | Up to 2 extra attempts when the delay is at most 60 seconds. |
+| Safe reads and idempotent account linking | Up to 2 extra attempts for transport failures and HTTP 500, 502, 503, 504. |
+| Verification or job submission after sending | Never retry read timeouts or 5xx: another send could consume quota twice. |
+| Other 4xx | No automatic retry; correct the input or permissions. |
 
-Public errors and response headers redact the configured key, including percent and JSON-escaped forms. Transport causes retain sanitized diagnostics only. `SensitiveRawBody()` deliberately returns the original body; keep it out of logs.
+Retries use exponential backoff with jitter and respect `Retry-After` up to 60 seconds. A failed network call does not prove that a billed operation was never processed.
 
-## Webhook signatures
+## Webhooks
 
-Read the untouched request body into `rawBody`, then authenticate it before processing. In an HTTP handler, use:
+Set `EASYSLIP_WEBHOOK_SECRET`, save this program as `main.go`, then run `go run .`. The handler reads the original body and `X-EasySlip-Signature`, returns 400 for an invalid signature, and acknowledges a verified event with 204. Replace the logging step with durable storage or a queue before using it to confirm payments; process each job id once. Deploy behind HTTPS with your usual ingress.
 
 ```go
-event, err := easyslip.ConstructWebhookEvent(rawBody, request.Header.Get(easyslip.WebhookSignatureHeader), os.Getenv("EASYSLIP_WEBHOOK_SECRET"))
-if err != nil {
-    http.Error(w, "Invalid signature", http.StatusBadRequest)
-    return
+package main
+
+import (
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/EASYSLIP-CO-LTD/sdk-go"
+)
+
+func main() {
+	secret := os.Getenv("EASYSLIP_WEBHOOK_SECRET")
+	if secret == "" {
+		log.Fatal("Set EASYSLIP_WEBHOOK_SECRET")
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /webhooks/easyslip", func(w http.ResponseWriter, r *http.Request) {
+		rawBody, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4<<20))
+		if err != nil {
+			http.Error(w, "Invalid body", http.StatusBadRequest)
+			return
+		}
+		event, err := easyslip.ConstructWebhookEvent(rawBody, r.Header.Get("X-EasySlip-Signature"), secret)
+		if err != nil {
+			http.Error(w, "Invalid webhook", http.StatusBadRequest)
+			return
+		}
+		// Save or enqueue durably, using JobID to prevent duplicate processing.
+		log.Printf("Verified job %s: %s", event.JobID, event.Status)
+		w.WriteHeader(http.StatusNoContent)
+	})
+	server := &http.Server{Addr: ":8000", Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second}
+	log.Fatal(server.ListenAndServe())
 }
-_ = event
 ```
 
-## Examples and API documentation
+## Security and privacy
 
-See [runnable examples](examples/README.md) for every operation and the [Go SDK reference](https://document.easyslip.com/en/sdk/go) for API fields.
+Keep the API key on your server, never in a browser or mobile application. Public errors and response headers redact the configured key, including percent-encoded and JSON-escaped forms, and always hide authorization headers. Transport causes contain sanitized diagnostics. `SensitiveRawBody()` returns the original error body and can expose secrets; keep it out of logs. Transfer results include personal data such as names and account numbers. Limit access, retention and what you print in application logs.
+
+## Versioning and support policy
+
+This SDK follows semantic versioning. Breaking public API changes require a major version. The runtime support policy follows versions still supported upstream; changes to the supported range are announced in the [changelog](CHANGELOG.md).
+
+## Examples and documentation
+
+[Runnable examples](examples/README.md) include one program per operation. Read the [Go SDK guide](https://document.easyslip.com/en/sdk/go) and [API reference](https://document.easyslip.com) for all options.
 
 ## Support
 
-For account or quota questions, contact [EasySlip](https://easyslip.com/). Report SDK bugs in [GitHub Issues](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues), without keys or personal data. Report security issues privately through [SECURITY.md](SECURITY.md).
+For SDK bugs, open a [GitHub issue](https://github.com/EASYSLIP-CO-LTD/sdk-go/issues) with a small reproduction and request id. For account and quota questions, contact [EasySlip support](https://developer.easyslip.com).
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup and test commands.
+
+## Security reports
+
+Follow [SECURITY.md](SECURITY.md) to report privately. Never post API keys or customer slips in public issues.
 
 ## License
 
-[MIT](LICENSE), copyright 2026 EasySlip Co., Ltd.
+[MIT](LICENSE), Copyright (c) 2026 EasySlip Co., Ltd.
