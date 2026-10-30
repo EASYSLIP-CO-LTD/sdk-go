@@ -24,7 +24,7 @@ func TestGuidesUseIdenticalStandalonePrograms(t *testing.T) {
 		t.Fatal(err)
 	}
 	left, right := fence.FindAllStringSubmatch(string(english), -1), fence.FindAllStringSubmatch(string(thai), -1)
-	if len(left) != 13 || len(right) != len(left) {
+	if len(left) != 14 || len(right) != len(left) {
 		t.Fatalf("program count: %d / %d", len(left), len(right))
 	}
 	for index := range left {

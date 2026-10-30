@@ -94,7 +94,7 @@ func main() {
 
 รัน `go run .` เมื่อตรวจผ่าน ผลลัพธ์จะมีลักษณะดังนี้ (ข้อมูลตัวอย่าง):
 
-    Amount: 150.0
+    Amount: 150
     Date: 2026-10-29T14:32:00+07:00
     Sender: ผู้โอนตัวอย่าง
     Receiver: ร้านตัวอย่าง
@@ -276,7 +276,7 @@ func main() {
 	}
 	account, err := client.BankAccounts.Create(ctx, easyslip.CreateBankAccountParams{
 		BankCode: "004", BankNumber: os.Getenv("RECEIVING_ACCOUNT_NUMBER"),
-		NameTh: "ร้านตัวอย่าง", NameEn: "Example Shop", Type: "BANK",
+		NameTh: "ร้านตัวอย่าง", NameEn: "Example Shop", Type: easyslip.AccountTypeJuristic,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -338,7 +338,7 @@ func main() {
 
 ### สร้าง QR รับชำระ
 
-ตั้ง `PROMPTPAY_PHONE` เป็นเบอร์พร้อมเพย์ของคุณ สำหรับบิลเพย์เมนต์ใช้ `Type: "BILL_PAYMENT"` พร้อม `BillerID` และเลขอ้างอิง ยอดเงินต้องอยู่ในช่วง 0.01 ถึง 9,999,999,999.99 และมีทศนิยมไม่เกินสองตำแหน่ง ถ้าไม่กำหนดยอดให้เว้น amount ไว้ บันทึกรูปที่ API ส่งกลับได้ดังนี้:
+ตั้ง `PROMPTPAY_PHONE` เป็นเบอร์พร้อมเพย์ของคุณ สำหรับบิลเพย์เมนต์ใช้ `Type: easyslip.QRTypePromptPay` พร้อม `BillerID` และ `Ref1` โดย `Ref2` ไม่บังคับ ส่วน `QRTypeBillPayment` ยังใช้ได้สำหรับระบบที่เชื่อมต่อไว้แล้ว ยอดเงินต้องอยู่ในช่วง 0.01 ถึง 9,999,999,999.99 และมีทศนิยมไม่เกินสองตำแหน่ง ถ้าไม่กำหนดยอดให้เว้น amount ไว้ บันทึกรูปที่ API ส่งกลับได้ดังนี้:
 
 ```go
 package main
@@ -358,7 +358,7 @@ func main() {
 	defer client.Close()
 	ctx := context.Background()
 	qr, err := client.V1.GenerateQR(ctx, easyslip.QRRequest{
-		Type: "PROMPTPAY", Msisdn: easyslip.Some(os.Getenv("PROMPTPAY_PHONE")), Amount: easyslip.Some(150.0),
+		Type: easyslip.QRTypePromptPay, Msisdn: easyslip.Some(os.Getenv("PROMPTPAY_PHONE")), Amount: easyslip.Some(150.0),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -371,6 +371,33 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Print("Saved payment-qr.png")
+}
+```
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    easyslip "github.com/EASYSLIP-CO-LTD/sdk-go"
+)
+
+func main() {
+    client, err := easyslip.NewClient("")
+    if err != nil { log.Fatal(err) }
+    defer client.Close()
+    qr, err := client.V1.GenerateQR(context.Background(), easyslip.QRRequest{
+        Type: easyslip.QRTypePromptPay,
+        BillerID: easyslip.Some(os.Getenv("BILLER_ID")),
+        Ref1: easyslip.Some(os.Getenv("BILL_REFERENCE")),
+        Amount: easyslip.Some(150.0),
+    })
+    if err != nil { log.Fatal(err) }
+    fmt.Println(qr.Image)
 }
 ```
 
@@ -503,6 +530,8 @@ func main() {
 
 `EasySlipError` เป็น interface หลัก ข้อผิดพลาด HTTP unwrap ไปที่ `ApiError` และ `RequestTimeoutError` unwrap ผ่าน `NetworkError` ใช้ `errors.As` ตรวจชนิด และ `errors.Is` ตรวจ `context.Canceled` หรือ `context.DeadlineExceeded`
 
+SDK เลือกคลาสจากรหัสข้อผิดพลาดที่รู้จักก่อน ถ้าไม่รู้จักจึงเลือกตาม HTTP status ส่วน 4xx ที่ไม่ได้ระบุใช้ `APIError`
+
 | คลาส | HTTP status หรือจุดที่เกิด | สาเหตุ | วิธีจัดการ |
 | --- | --- | --- | --- |
 | `EasySlipError (interface)` | ขึ้นกับข้อผิดพลาด | คลาสหลักของข้อผิดพลาด SDK | ดักคลาสที่เฉพาะเจาะจงก่อน |
@@ -510,8 +539,8 @@ func main() {
 | `AuthenticationError` | 401 | API key ไม่ถูกต้อง | ตรวจ key ของบริการนี้ |
 | `PermissionDeniedError` | 403 | บริการ สาขา หรือ IP ไม่มีสิทธิ์เรียก API | ตรวจสิทธิ์บริการและข้อจำกัด IP |
 | `QuotaExceededError` | 403 | โควต้าตรวจสลิปหมด | เพิ่มโควต้าก่อนรับสลิปเพิ่ม |
-| `InvalidRequestError` | 400, 422 | API ไม่รับค่าที่ส่งไป | แก้ข้อมูลก่อนส่งอีกครั้ง |
-| `InvalidImageError` | 400, 413, 415 | รูปอ่านไม่ได้ ใหญ่เกิน หรือไม่รองรับ | ส่งรูปสลิปที่ชัดและเป็นชนิดที่รองรับ |
+| `InvalidRequestError` | 400 | API ไม่รับค่าที่ส่งไป | แก้ข้อมูลก่อนส่งอีกครั้ง |
+| `InvalidImageError` | 400 | รูปอ่านไม่ได้ ใหญ่เกิน หรือไม่รองรับ | ส่งรูปสลิปที่ชัดและเป็นชนิดที่รองรับ |
 | `InvalidUrlError` | 400 | API ไม่รับ URL รูปหรือ callback | ใช้ HTTPS URL ที่เข้าถึงได้จากภายนอก |
 | `DuplicateSlipError` | 400 (v1) | ส่งสลิปที่เคยตรวจแล้วโดยเปิดตรวจสลิปซ้ำ | อย่าเติมเงินซ้ำ ตรวจผลเดิมจาก slip |
 | `NotFoundError` | 404 | ไม่พบข้อมูลหรือข้อมูลอยู่นอกสาขานี้ | ตรวจ id บัญชีหรือ job และสาขา |
@@ -519,7 +548,7 @@ func main() {
 | `SlipPendingError` | 404 | ธนาคารยังไม่พร้อมให้ตรวจสลิปที่เพิ่งโอน | รอสักครู่แล้วตรวจใหม่ |
 | `ConflictError` | 409 | มีบัญชีรับเงินนี้แล้ว | ใช้บัญชีเดิมแทนการสร้างซ้ำ |
 | `RateLimitError` | 429 | ส่งคำขอถี่เกินไป | รอตาม RetryAfter หากมี |
-| `ServerError` | 500, 502, 504 | API หรือธนาคารประมวลผลไม่สำเร็จ | ตรวจผลรายการที่อาจใช้โควต้าแล้วก่อนส่งซ้ำ |
+| `ServerError` | 500, 502, 504; 5xx อื่นยกเว้น 503 | API หรือธนาคารประมวลผลไม่สำเร็จ | ตรวจผลรายการที่อาจใช้โควต้าแล้วก่อนส่งซ้ำ |
 | `ServiceUnavailableError` | 503 | บริการที่เกี่ยวข้องไม่พร้อม | รอและตรวจสถานะบริการ |
 | `InputError` | ก่อนส่ง | SDK ไม่รับข้อมูลก่อนส่ง | แก้ค่าที่ระบุใน code |
 | `NetworkError` | เครือข่าย | เชื่อมต่อไม่สำเร็จ | ตรวจเครือข่ายและผลรายการก่อนส่งซ้ำ |

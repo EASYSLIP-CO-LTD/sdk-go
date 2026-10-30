@@ -5,6 +5,25 @@ import (
 	"encoding/json"
 )
 
+// AccountType identifies the legal owner of a receiving account.
+type AccountType string
+
+const (
+	AccountTypeNatural  AccountType = "NATURAL"
+	AccountTypeJuristic AccountType = "JURISTIC"
+)
+
+// QRType selects the QR format accepted by the API.
+type QRType string
+
+const (
+	QRTypePromptPay   QRType = "PROMPTPAY"
+	QRTypeBillPayment QRType = "BILL_PAYMENT"
+	QRTypeKShop       QRType = "KSHOP"
+	QRTypeMaeManee    QRType = "MAE_MANEE"
+	QRTypeTungngern   QRType = "TUNGNGERN"
+)
+
 // Info contains typed wire fields.
 type Info struct {
 	Meta        ResponseMeta    `json:"-"`
@@ -541,7 +560,7 @@ type CreateBankAccountParams struct {
 	BankNumber  string        `json:"bankNumber"`
 	NameTh      string        `json:"nameTh"`
 	NameEn      string        `json:"nameEn"`
-	Type        string        `json:"type"`
+	Type        AccountType   `json:"type"`
 	ExtraVerify Field[string] `json:"extraVerify"`
 	MatchMode   Field[string] `json:"matchMode"`
 }
@@ -551,14 +570,14 @@ func (v CreateBankAccountParams) MarshalJSON() ([]byte, error) { return marshalF
 
 // UpdateBankAccountParams contains typed wire fields.
 type UpdateBankAccountParams struct {
-	Meta        ResponseMeta   `json:"-"`
-	BankCode    Field[string]  `json:"bankCode"`
-	BankNumber  Field[string]  `json:"bankNumber"`
-	NameTh      Field[string]  `json:"nameTh"`
-	NameEn      Field[string]  `json:"nameEn"`
-	Type        Field[string]  `json:"type"`
-	ExtraVerify Field[*string] `json:"extraVerify"`
-	MatchMode   Field[string]  `json:"matchMode"`
+	Meta        ResponseMeta       `json:"-"`
+	BankCode    Field[string]      `json:"bankCode"`
+	BankNumber  Field[string]      `json:"bankNumber"`
+	NameTh      Field[string]      `json:"nameTh"`
+	NameEn      Field[string]      `json:"nameEn"`
+	Type        Field[AccountType] `json:"type"`
+	ExtraVerify Field[*string]     `json:"extraVerify"`
+	MatchMode   Field[string]      `json:"matchMode"`
 }
 
 // MarshalJSON preserves absent fields on UpdateBankAccountParams.
@@ -610,11 +629,11 @@ func (v V1VerifyOptions) MarshalJSON() ([]byte, error) { return marshalFields(v)
 
 // ListBankAccountsParams contains typed wire fields.
 type ListBankAccountsParams struct {
-	Meta     ResponseMeta  `json:"-"`
-	Type     Field[string] `json:"type"`
-	BankCode Field[string] `json:"bankCode"`
-	Page     Field[int]    `json:"page"`
-	Limit    Field[int]    `json:"limit"`
+	Meta     ResponseMeta       `json:"-"`
+	Type     Field[AccountType] `json:"type"`
+	BankCode Field[string]      `json:"bankCode"`
+	Page     Field[int]         `json:"page"`
+	Limit    Field[int]         `json:"limit"`
 }
 
 // MarshalJSON preserves absent fields on ListBankAccountsParams.
@@ -627,7 +646,7 @@ func (v ListBankAccountsParams) MarshalJSON() ([]byte, error) { return marshalFi
 // 15-digit shop id. TUNGNGERN needs MerchantName, the English shop name. Fields are sent as given.
 type QRRequest struct {
 	Meta         ResponseMeta   `json:"-"`
-	Type         string         `json:"type"`
+	Type         QRType         `json:"type"`
 	Msisdn       Field[string]  `json:"msisdn"`
 	NatID        Field[string]  `json:"natId"`
 	EWalletID    Field[string]  `json:"eWalletId"`

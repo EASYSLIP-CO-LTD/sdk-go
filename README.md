@@ -94,7 +94,7 @@ func main() {
 
 Run `go run .`. A successful check prints output like this (illustrative values):
 
-    Amount: 150.0
+    Amount: 150
     Date: 2026-10-29T14:32:00+07:00
     Sender: ผู้โอนตัวอย่าง
     Receiver: ร้านตัวอย่าง
@@ -276,7 +276,7 @@ func main() {
 	}
 	account, err := client.BankAccounts.Create(ctx, easyslip.CreateBankAccountParams{
 		BankCode: "004", BankNumber: os.Getenv("RECEIVING_ACCOUNT_NUMBER"),
-		NameTh: "ร้านตัวอย่าง", NameEn: "Example Shop", Type: "BANK",
+		NameTh: "ร้านตัวอย่าง", NameEn: "Example Shop", Type: easyslip.AccountTypeJuristic,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -338,7 +338,7 @@ func main() {
 
 ### Generate a payment QR
 
-Set `PROMPTPAY_PHONE` to your PromptPay phone number. For bill payment, use `Type: "BILL_PAYMENT"` with `BillerID` and your references. Amounts must be from 0.01 to 9,999,999,999.99 with at most two decimal places; omit the amount for an open-amount QR. Save the image returned by the API:
+Set `PROMPTPAY_PHONE` to your PromptPay phone number. For bill payment, use `Type: easyslip.QRTypePromptPay` with `BillerID` and `Ref1`; `Ref2` is optional. The older `QRTypeBillPayment` type still works for existing integrations. Amounts must be from 0.01 to 9,999,999,999.99 with at most two decimal places; omit the amount for an open-amount QR. Save the image returned by the API:
 
 ```go
 package main
@@ -358,7 +358,7 @@ func main() {
 	defer client.Close()
 	ctx := context.Background()
 	qr, err := client.V1.GenerateQR(ctx, easyslip.QRRequest{
-		Type: "PROMPTPAY", Msisdn: easyslip.Some(os.Getenv("PROMPTPAY_PHONE")), Amount: easyslip.Some(150.0),
+		Type: easyslip.QRTypePromptPay, Msisdn: easyslip.Some(os.Getenv("PROMPTPAY_PHONE")), Amount: easyslip.Some(150.0),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -371,6 +371,33 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Print("Saved payment-qr.png")
+}
+```
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    easyslip "github.com/EASYSLIP-CO-LTD/sdk-go"
+)
+
+func main() {
+    client, err := easyslip.NewClient("")
+    if err != nil { log.Fatal(err) }
+    defer client.Close()
+    qr, err := client.V1.GenerateQR(context.Background(), easyslip.QRRequest{
+        Type: easyslip.QRTypePromptPay,
+        BillerID: easyslip.Some(os.Getenv("BILLER_ID")),
+        Ref1: easyslip.Some(os.Getenv("BILL_REFERENCE")),
+        Amount: easyslip.Some(150.0),
+    })
+    if err != nil { log.Fatal(err) }
+    fmt.Println(qr.Image)
 }
 ```
 
@@ -503,6 +530,8 @@ func main() {
 
 `EasySlipError` is the root interface; HTTP errors unwrap to `ApiError`, and `RequestTimeoutError` unwraps through `NetworkError`. Use `errors.As` for error types and `errors.Is` for `context.Canceled` or `context.DeadlineExceeded`.
 
+A recognized API error code selects the error class first; otherwise the SDK uses the HTTP status. Unmapped 4xx responses use `APIError`.
+
 | Error class | HTTP status or stage | When it happens | What to do |
 | --- | --- | --- | --- |
 | `EasySlipError (interface)` | varies | Base for all SDK failures. | Catch a specific error first. |
@@ -510,8 +539,8 @@ func main() {
 | `AuthenticationError` | 401 | API key is invalid. | Check the key for this service. |
 | `PermissionDeniedError` | 403 | Service, branch or IP cannot call the API. | Check service access and IP restrictions. |
 | `QuotaExceededError` | 403 | Verification quota is exhausted. | Add quota before accepting more slips. |
-| `InvalidRequestError` | 400, 422 | The API rejects an argument. | Correct the request before sending again. |
-| `InvalidImageError` | 400, 413, 415 | Image is unreadable, oversized or unsupported. | Send a readable supported image. |
+| `InvalidRequestError` | 400 | The API rejects an argument. | Correct the request before sending again. |
+| `InvalidImageError` | 400 | Image is unreadable, oversized or unsupported. | Send a readable supported image. |
 | `InvalidUrlError` | 400 | Image or callback URL is refused. | Use a reachable public HTTPS URL. |
 | `DuplicateSlipError` | 400 (v1) | A previously verified slip is submitted with duplicate checking. | Do not credit the same transfer again; inspect slip. |
 | `NotFoundError` | 404 | Resource is missing or outside this branch. | Check the account or job id and branch. |
@@ -519,7 +548,7 @@ func main() {
 | `SlipPendingError` | 404 | A recent slip is not available from the bank yet. | Wait before checking again. |
 | `ConflictError` | 409 | Receiving account already exists. | Reuse it instead of creating another. |
 | `RateLimitError` | 429 | Request rate is too high. | Wait for RetryAfter when present. |
-| `ServerError` | 500, 502, 504 | The API or bank could not finish the request. | Reconcile billed calls before resending. |
+| `ServerError` | 500, 502, 504; other 5xx except 503 | The API or bank could not finish the request. | Reconcile billed calls before resending. |
 | `ServiceUnavailableError` | 503 | A dependency is unavailable. | Wait and check service status. |
 | `InputError` | before sending | Local validation rejects input. | Fix the argument identified by code. |
 | `NetworkError` | network | Connection fails. | Check connectivity and reconcile the outcome. |
