@@ -530,7 +530,7 @@ func main() {
 
 `EasySlipError` is the root interface; HTTP errors unwrap to `ApiError`, and `RequestTimeoutError` unwraps through `NetworkError`. Use `errors.As` for error types and `errors.Is` for `context.Canceled` or `context.DeadlineExceeded`.
 
-A recognized API error code selects the error class first; otherwise the SDK uses the HTTP status. Unmapped 4xx responses use `APIError`.
+A recognized API error code selects the error class first; otherwise the SDK uses the HTTP status. Unmapped 4xx responses use `ApiError`.
 
 | Error class | HTTP status or stage | When it happens | What to do |
 | --- | --- | --- | --- |

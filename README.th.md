@@ -530,7 +530,7 @@ func main() {
 
 `EasySlipError` เป็น interface หลัก ข้อผิดพลาด HTTP unwrap ไปที่ `ApiError` และ `RequestTimeoutError` unwrap ผ่าน `NetworkError` ใช้ `errors.As` ตรวจชนิด และ `errors.Is` ตรวจ `context.Canceled` หรือ `context.DeadlineExceeded`
 
-SDK เลือกคลาสจากรหัสข้อผิดพลาดที่รู้จักก่อน ถ้าไม่รู้จักจึงเลือกตาม HTTP status ส่วน 4xx ที่ไม่ได้ระบุใช้ `APIError`
+SDK เลือกคลาสจากรหัสข้อผิดพลาดที่รู้จักก่อน ถ้าไม่รู้จักจึงเลือกตาม HTTP status ส่วน 4xx ที่ไม่ได้ระบุใช้ `ApiError`
 
 | คลาส | HTTP status หรือจุดที่เกิด | สาเหตุ | วิธีจัดการ |
 | --- | --- | --- | --- |
