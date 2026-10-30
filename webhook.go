@@ -37,6 +37,16 @@ func VerifyWebhookSignature(rawBody []byte, signature, secret string) bool {
 
 // ParseWebhookEvent parses a body without authentication.
 func ParseWebhookEvent(rawBody []byte) (*WebhookEvent, error) {
+	var shape map[string]json.RawMessage
+	if json.Unmarshal(rawBody, &shape) != nil || shape == nil {
+		return nil, inputError("INVALID_ARGUMENT", "Webhook body must be an event JSON object")
+	}
+	for _, field := range []string{"jobId", "status", "timestamp"} {
+		var value *string
+		if json.Unmarshal(shape[field], &value) != nil || value == nil {
+			return nil, inputError("INVALID_ARGUMENT", "Webhook body must contain jobId, status and timestamp strings")
+		}
+	}
 	var event WebhookEvent
 	if json.Unmarshal(rawBody, &event) != nil {
 		return nil, inputError("INVALID_ARGUMENT", "Invalid webhook JSON")
