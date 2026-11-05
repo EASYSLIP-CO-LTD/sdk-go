@@ -8,7 +8,8 @@
       "include-v-in-tag": true,
       "include-component-in-tag": false,
       "extra-files": [
-        "client.go"
+        "client.go",
+        "transport.go"
       ]
     }
   }
