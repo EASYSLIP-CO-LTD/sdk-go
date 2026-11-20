@@ -5,7 +5,7 @@
   "source": "docs",
   "recordedAt": "2026-10-29",
   "conformance": "call",
-  "note": "The provider sent no phone: neither sender nor receiver is present.",
+  "note": "The API sent no phone: neither sender nor receiver is present.",
   "call": {
     "args": {
       "payload": "SDKFIXTURE-WALLET-QR-0001"

@@ -483,7 +483,7 @@ func main() {
 | `RawSlip.Receiver.Phone` | string (Wallet) | เบอร์ผู้รับ Wallet ปิดบางหลักไว้ ว่างถ้า API ไม่ส่งมา | 08-xxx-9876 |
 | `RawSlip.Sender.Name`, `RawSlip.Receiver.Name` | string (Wallet) | ชื่อ เลิกใช้แล้ว ผลใหม่เป็นค่าว่าง มีเฉพาะผลรุ่นเก่า | ผู้รับตัวอย่าง |
 
-ผล Wallet ไม่มีชื่อ `Name` จึงว่าง ถ้า API ไม่มีเบอร์ของฝั่งไหน ฝั่งนั้นก็ว่างเช่นกัน ใช้ `RawSlip.HasSender()` และ `RawSlip.HasReceiver()` แยกฝั่งที่ไม่มีมากับฝั่งที่ว่าง
+ผล Wallet ใหม่ไม่มีชื่อ `Name` จึงว่าง ถ้า API ไม่มีเบอร์ของฝั่งไหน ฝั่งนั้นก็ว่างเช่นกัน ใช้ `RawSlip.HasSender()` และ `RawSlip.HasReceiver()` แยกฝั่งที่ไม่มีมากับฝั่งที่ว่าง
 
 อ่านเลขบัญชีจาก `AccountNumber.Account` หลังตรวจฟิลด์ด้วย `Value()`
 

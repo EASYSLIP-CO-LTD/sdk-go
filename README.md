@@ -483,7 +483,7 @@ The bank and Wallet result share amount and payment-check fields. Bank details a
 | `RawSlip.Receiver.Phone` | string (Wallet) | Wallet receiver phone, partly hidden. Empty when the API sent none | 08-xxx-9876 |
 | `RawSlip.Sender.Name`, `RawSlip.Receiver.Name` | string (Wallet) | Name. Deprecated: empty in new results, only older ones have it | ผู้รับตัวอย่าง |
 
-A Wallet result has no names, so `Name` is empty. When the API has no phone for a side, that side is empty too. `RawSlip.HasSender()` and `RawSlip.HasReceiver()` tell a missing side from an empty one.
+New Wallet results have no names, so `Name` is empty. When the API has no phone for a side, that side is empty too. `RawSlip.HasSender()` and `RawSlip.HasReceiver()` tell a missing side from an empty one.
 
 Read the account number from `AccountNumber.Account` after checking the field with `Value()`.
 
