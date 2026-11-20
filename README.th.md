@@ -186,7 +186,7 @@ func main() {
 
 ### ใบเสร็จ TrueMoney Wallet
 
-ใช้รูปใบเสร็จ Wallet และตรวจผลบัญชี ยอดเงิน และสลิปซ้ำก่อนยืนยันคำสั่งซื้อเช่นเดียวกับสลิปธนาคาร เลขอ้างอิงอยู่ที่ `RawSlip.TransactionID`
+ใช้รูปใบเสร็จ Wallet หรือข้อความใน QR ของรายการโอนด้วย `client.Verify.TruewalletByPayload(ctx, payload, nil)` (v1: `client.V1.VerifyTruemoneyByPayload`) และตรวจผลบัญชี ยอดเงิน และสลิปซ้ำก่อนยืนยันคำสั่งซื้อเช่นเดียวกับสลิปธนาคาร เลขอ้างอิงอยู่ที่ `RawSlip.TransactionID`
 
 ```go
 package main
@@ -479,9 +479,11 @@ func main() {
 | `RawSlip.Sender.Account.Bank` | `Field[AccountNumber]` | เลขบัญชีผู้โอนตามที่ API ส่งมา อาจปิดบังบางส่วน | xxx-x-x1234-x |
 | `RawSlip.Receiver.Account.Bank` | `Field[AccountNumber]` | เลขบัญชีผู้รับตามที่ API ส่งมา อาจปิดบังบางส่วน | xxx-x-x5678-x |
 | `RawSlip.TransactionID` | string (Wallet) | เลขอ้างอิงรายการ Wallet | EXAMPLE-WALLET-001 |
-| `RawSlip.Sender.Name` | string (Wallet) | ชื่อผู้ส่ง Wallet | ผู้ส่งตัวอย่าง |
-| `RawSlip.Receiver.Name` | string (Wallet) | ชื่อผู้รับ Wallet | ผู้รับตัวอย่าง |
-| `RawSlip.Receiver.Phone` | string (Wallet) | เบอร์ผู้รับ Wallet ตามที่ API ส่งมา | 0xx-xxx-1234 |
+| `RawSlip.Sender.Phone` | string (Wallet) | เบอร์ผู้ส่ง Wallet ปิดบางหลักไว้ ว่างถ้า API ไม่ส่งมา | 08-xxx-2345 |
+| `RawSlip.Receiver.Phone` | string (Wallet) | เบอร์ผู้รับ Wallet ปิดบางหลักไว้ ว่างถ้า API ไม่ส่งมา | 08-xxx-9876 |
+| `RawSlip.Sender.Name`, `RawSlip.Receiver.Name` | string (Wallet) | ชื่อ เลิกใช้แล้ว ผลใหม่เป็นค่าว่าง มีเฉพาะผลรุ่นเก่า | ผู้รับตัวอย่าง |
+
+ผล Wallet ใหม่ไม่มีชื่อ `Name` จึงว่าง ถ้า API ไม่มีเบอร์ของฝั่งไหน ฝั่งนั้นก็ว่างเช่นกัน ใช้ `RawSlip.HasSender()` และ `RawSlip.HasReceiver()` แยกฝั่งที่ไม่มีมากับฝั่งที่ว่าง
 
 อ่านเลขบัญชีจาก `AccountNumber.Account` หลังตรวจฟิลด์ด้วย `Value()`
 

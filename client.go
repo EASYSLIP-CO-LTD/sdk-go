@@ -313,6 +313,20 @@ func (s *VerifyService) BankByURL(ctx context.Context, value string, options *Ve
 	return call[BankSlipResult](ctx, s.t, "POST", "/verify/bank", b, false)
 }
 
+// TruewalletByPayload verifies one wallet transfer from the text of its QR code; successful
+// verification may spend quota.
+func (s *VerifyService) TruewalletByPayload(ctx context.Context, value string, options *VerifyOptions) (*TrueWalletResult, error) {
+	if err := checkText(value, 256); err != nil {
+		return nil, err
+	}
+	b, err := wireMap(options)
+	if err != nil {
+		return nil, inputError("INVALID_ARGUMENT", "Invalid options")
+	}
+	b["payload"] = value
+	return call[TrueWalletResult](ctx, s.t, "POST", "/verify/truewallet", b, false)
+}
+
 // TruewalletByImage verifies one slip; successful verification may spend quota.
 func (s *VerifyService) TruewalletByImage(ctx context.Context, value any, options *VerifyOptions) (*TrueWalletResult, error) {
 	return upload[TrueWalletResult](ctx, s.t, "/verify/truewallet", "image", value, options)
@@ -649,6 +663,19 @@ func (s *V1Service) VerifyBankByURL(ctx context.Context, imageURL string, option
 	}
 	b["url"] = imageURL
 	return call[BankSlip](ctx, s.t, "POST", "/verify", b, false)
+}
+
+// VerifyTruemoneyByPayload verifies one wallet transfer from the text of its QR code.
+func (s *V1Service) VerifyTruemoneyByPayload(ctx context.Context, payload string, options *V1VerifyOptions) (*TrueWalletSlip, error) {
+	if e := checkText(payload, 256); e != nil {
+		return nil, e
+	}
+	b, e := wireMap(options)
+	if e != nil {
+		return nil, e
+	}
+	b["payload"] = payload
+	return call[TrueWalletSlip](ctx, s.t, "POST", "/verify/truewallet", b, false)
 }
 
 // VerifyTruemoneyByImage uploads one wallet slip.
