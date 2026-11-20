@@ -157,6 +157,8 @@ func fixtureInvoke(ctx context.Context, c *Client, operation string, args map[st
 		return c.Verify.BankByBase64(ctx, valueArg(args, "base64"), fixtureDecode[VerifyOptions](optJSON))
 	case "verify.bankByUrl":
 		return c.Verify.BankByURL(ctx, valueArg(args, "url"), fixtureDecode[VerifyOptions](optJSON))
+	case "verify.truewalletByPayload":
+		return c.Verify.TruewalletByPayload(ctx, valueArg(args, "payload"), fixtureDecode[VerifyOptions](optJSON))
 	case "verify.truewalletByImage":
 		return c.Verify.TruewalletByImage(ctx, file(), fixtureDecode[VerifyOptions](optJSON))
 	case "verify.truewalletByBase64":
@@ -171,6 +173,8 @@ func fixtureInvoke(ctx context.Context, c *Client, operation string, args map[st
 		return c.V1.VerifyBankByBase64(ctx, valueArg(args, "base64"), fixtureDecode[V1VerifyOptions](optJSON))
 	case "v1.verifyBankByUrl":
 		return c.V1.VerifyBankByURL(ctx, valueArg(args, "url"), fixtureDecode[V1VerifyOptions](optJSON))
+	case "v1.verifyTruemoneyByPayload":
+		return c.V1.VerifyTruemoneyByPayload(ctx, valueArg(args, "payload"), fixtureDecode[V1VerifyOptions](optJSON))
 	case "v1.verifyTruemoneyByImage":
 		return c.V1.VerifyTruemoneyByImage(ctx, file(), fixtureDecode[V1VerifyOptions](optJSON))
 	}

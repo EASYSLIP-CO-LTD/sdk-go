@@ -301,6 +301,10 @@ type MatchedBank struct {
 func (v MatchedBank) MarshalJSON() ([]byte, error) { return marshalFields(v) }
 
 // TrueWalletSlip contains typed wire fields.
+//
+// Newer results carry no names, and a side is missing when the API has no phone for it, so a
+// slip can come back with neither Sender nor Receiver. A missing side decodes to the zero
+// value, never an error. HasSender and HasReceiver tell a missing side from an empty one.
 type TrueWalletSlip struct {
 	Meta          ResponseMeta       `json:"-"`
 	TransactionID string             `json:"transactionId"`
@@ -308,29 +312,81 @@ type TrueWalletSlip struct {
 	Amount        float64            `json:"amount"`
 	Sender        TrueWalletSender   `json:"sender"`
 	Receiver      TrueWalletReceiver `json:"receiver"`
+
+	hasSender, hasReceiver bool
 }
 
-// MarshalJSON preserves absent fields on TrueWalletSlip.
-func (v TrueWalletSlip) MarshalJSON() ([]byte, error) { return marshalFields(v) }
+// HasSender reports whether the API sent a sender object.
+func (v TrueWalletSlip) HasSender() bool {
+	return v.hasSender || v.Sender.Name != "" || v.Sender.Phone != ""
+}
 
-// TrueWalletSender contains typed wire fields.
+// HasReceiver reports whether the API sent a receiver object.
+func (v TrueWalletSlip) HasReceiver() bool {
+	return v.hasReceiver || v.Receiver.Name != "" || v.Receiver.Phone != ""
+}
+
+// UnmarshalJSON decodes the slip and remembers which sides were present.
+func (v *TrueWalletSlip) UnmarshalJSON(raw []byte) error {
+	type plain TrueWalletSlip
+	var decoded plain
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return err
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &keys); err != nil {
+		return err
+	}
+	_, decoded.hasSender = keys["sender"]
+	_, decoded.hasReceiver = keys["receiver"]
+	*v = TrueWalletSlip(decoded)
+	return nil
+}
+
+// MarshalJSON writes only the sides that were present.
+func (v TrueWalletSlip) MarshalJSON() ([]byte, error) {
+	data := map[string]any{"transactionId": v.TransactionID, "date": v.Date, "amount": v.Amount}
+	if v.HasSender() {
+		data["sender"] = v.Sender
+	}
+	if v.HasReceiver() {
+		data["receiver"] = v.Receiver
+	}
+	return json.Marshal(data)
+}
+
+// TrueWalletSender contains typed wire fields. Name is deprecated and empty in newer results.
+// Phone is partly hidden, for example 08-xxx-2345, and is empty when the API did not send one.
 type TrueWalletSender struct {
-	Meta ResponseMeta `json:"-"`
-	Name string       `json:"name"`
+	Meta  ResponseMeta `json:"-"`
+	Name  string       `json:"name"`
+	Phone string       `json:"phone"`
 }
 
-// MarshalJSON preserves absent fields on TrueWalletSender.
-func (v TrueWalletSender) MarshalJSON() ([]byte, error) { return marshalFields(v) }
+// MarshalJSON omits the fields that are empty.
+func (v TrueWalletSender) MarshalJSON() ([]byte, error) { return marshalParty(v.Name, v.Phone) }
 
-// TrueWalletReceiver contains typed wire fields.
+// TrueWalletReceiver contains typed wire fields. Name is deprecated and empty in newer results.
+// Phone is partly hidden, for example 08-xxx-9876, and is empty when the API did not send one.
 type TrueWalletReceiver struct {
 	Meta  ResponseMeta `json:"-"`
 	Name  string       `json:"name"`
 	Phone string       `json:"phone"`
 }
 
-// MarshalJSON preserves absent fields on TrueWalletReceiver.
-func (v TrueWalletReceiver) MarshalJSON() ([]byte, error) { return marshalFields(v) }
+// MarshalJSON omits the fields that are empty.
+func (v TrueWalletReceiver) MarshalJSON() ([]byte, error) { return marshalParty(v.Name, v.Phone) }
+
+func marshalParty(name, phone string) ([]byte, error) {
+	data := map[string]string{}
+	if name != "" {
+		data["name"] = name
+	}
+	if phone != "" {
+		data["phone"] = phone
+	}
+	return json.Marshal(data)
+}
 
 // Bank contains typed wire fields.
 type Bank struct {

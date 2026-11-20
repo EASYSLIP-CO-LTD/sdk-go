@@ -140,6 +140,8 @@ func invoke(ctx context.Context, c *sdk.Client, operation string, args map[strin
 		return c.Verify.BankByBase64(ctx, valueArg(args, "base64"), decode[sdk.VerifyOptions](optJSON))
 	case "verify.bankByUrl":
 		return c.Verify.BankByURL(ctx, valueArg(args, "url"), decode[sdk.VerifyOptions](optJSON))
+	case "verify.truewalletByPayload":
+		return c.Verify.TruewalletByPayload(ctx, valueArg(args, "payload"), decode[sdk.VerifyOptions](optJSON))
 	case "verify.truewalletByImage":
 		return c.Verify.TruewalletByImage(ctx, file(), decode[sdk.VerifyOptions](optJSON))
 	case "verify.truewalletByBase64":
@@ -154,6 +156,8 @@ func invoke(ctx context.Context, c *sdk.Client, operation string, args map[strin
 		return c.V1.VerifyBankByBase64(ctx, valueArg(args, "base64"), decode[sdk.V1VerifyOptions](optJSON))
 	case "v1.verifyBankByUrl":
 		return c.V1.VerifyBankByURL(ctx, valueArg(args, "url"), decode[sdk.V1VerifyOptions](optJSON))
+	case "v1.verifyTruemoneyByPayload":
+		return c.V1.VerifyTruemoneyByPayload(ctx, valueArg(args, "payload"), decode[sdk.V1VerifyOptions](optJSON))
 	case "v1.verifyTruemoneyByImage":
 		return c.V1.VerifyTruemoneyByImage(ctx, file(), decode[sdk.V1VerifyOptions](optJSON))
 	}

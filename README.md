@@ -186,7 +186,7 @@ func main() {
 
 ### TrueMoney Wallet
 
-Use a Wallet receipt image. Check the same payment flags before crediting the order; the receipt reference is `RawSlip.TransactionID`.
+Use a Wallet receipt image, or the text of the transfer QR code with `client.Verify.TruewalletByPayload(ctx, payload, nil)` (v1: `client.V1.VerifyTruemoneyByPayload`). Check the same payment flags before crediting the order; the receipt reference is `RawSlip.TransactionID`.
 
 ```go
 package main
@@ -479,9 +479,11 @@ The bank and Wallet result share amount and payment-check fields. Bank details a
 | `RawSlip.Sender.Account.Bank` | `Field[AccountNumber]` | Sender account number as returned, possibly masked | xxx-x-x1234-x |
 | `RawSlip.Receiver.Account.Bank` | `Field[AccountNumber]` | Receiver account number as returned, possibly masked | xxx-x-x5678-x |
 | `RawSlip.TransactionID` | string (Wallet) | Wallet transaction reference | EXAMPLE-WALLET-001 |
-| `RawSlip.Sender.Name` | string (Wallet) | Wallet sender name | ผู้ส่งตัวอย่าง |
-| `RawSlip.Receiver.Name` | string (Wallet) | Wallet receiver name | ผู้รับตัวอย่าง |
-| `RawSlip.Receiver.Phone` | string (Wallet) | Wallet receiver phone as returned | 0xx-xxx-1234 |
+| `RawSlip.Sender.Phone` | string (Wallet) | Wallet sender phone, partly hidden. Empty when the API sent none | 08-xxx-2345 |
+| `RawSlip.Receiver.Phone` | string (Wallet) | Wallet receiver phone, partly hidden. Empty when the API sent none | 08-xxx-9876 |
+| `RawSlip.Sender.Name`, `RawSlip.Receiver.Name` | string (Wallet) | Name. Deprecated: empty in new results, only older ones have it | ผู้รับตัวอย่าง |
+
+A Wallet result has no names, so `Name` is empty. When the API has no phone for a side, that side is empty too. `RawSlip.HasSender()` and `RawSlip.HasReceiver()` tell a missing side from an empty one.
 
 Read the account number from `AccountNumber.Account` after checking the field with `Value()`.
 

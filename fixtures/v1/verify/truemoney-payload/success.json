@@ -1,0 +1,49 @@
+{
+  "id": "v1.verify.truemoney-payload.success",
+  "api": "v1",
+  "operation": "v1.verifyTruemoneyByPayload",
+  "source": "docs",
+  "recordedAt": "2026-10-29",
+  "conformance": "call",
+  "call": {
+    "args": {
+      "payload": "SDKFIXTURE-WALLET-QR-0001",
+      "checkDuplicate": false
+    }
+  },
+  "request": {
+    "method": "POST",
+    "path": "/verify/truewallet",
+    "auth": "bearer",
+    "contentType": "application/json",
+    "body": {
+      "payload": "SDKFIXTURE-WALLET-QR-0001",
+      "checkDuplicate": false
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "cf-ray": "8f3a2b1c0d9e7f65-BKK",
+      "content-type": "application/json; charset=utf-8",
+      "x-request-id": "8f3a2b1c0d9e7f65-BKK"
+    },
+    "body": {
+      "status": 200,
+      "data": {
+        "transactionId": "50012345678902",
+        "date": "2026-12-03T22:05:00+07:00",
+        "amount": 200.25,
+        "sender": {
+          "phone": "08-xxx-2345"
+        },
+        "receiver": {
+          "phone": "08-xxx-9876"
+        }
+      }
+    }
+  },
+  "expect": {
+    "model": "TrueWalletSlip"
+  }
+}
